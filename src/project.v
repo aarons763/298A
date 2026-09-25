@@ -2,7 +2,7 @@
 // Paste this ENTIRE file into VGA Playground's project.v tab.
 // 25.175 MHz pixel clock; 640x480; active-high buttons.
 // One-tile candidate: actual GF180 fit MUST be checked by hardening.
-module tt_um_pong (
+module tt_um_example (
     input  wire [7:0] ui_in,
     output wire [7:0] uo_out,
     input  wire [7:0] uio_in,
