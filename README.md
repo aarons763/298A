@@ -1,42 +1,81 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+# Pong VGA
 
-# Tiny Tapeout Verilog Project Template
+A proposed two-player Pong game with a live VGA display, rotary-encoder controls, and hardware game logic.
 
-- [Read the documentation for project](docs/info.md)
+## Overview
 
-## What is Tiny Tapeout?
+This project aims to build a two-player Pong-style game displayed on a VGA monitor. Two rotary encoders control player movement, with the monitor and supporting hardware connected through a separate PCB.
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+Planned gameplay includes paddle and wall collisions, a serve button, and player scores from 0 to 10. Ball acceleration and additional collision-angle behaviour are optional extensions, depending on the transistor budget remaining after the main game logic is implemented.
 
-To learn more and get started, visit https://tinytapeout.com.
+## System Architecture
 
-## Set up your Verilog project
+![Pong VGA system architecture](assets/system-diagram.png)
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+The proposed architecture uses a single 25.175 MHz clock, updates the game once per frame, and renders pixels without a frame buffer.
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+## I/O Pin Assignments
 
-## Enable GitHub actions to build the results page
+| Pin | Direction | Signal |
+| --- | --- | --- |
+| `ui_in[0]` / `ui_in[1]` | Input | Player 1 up / down button |
+| `ui_in[2]` / `ui_in[3]` | Input | Player 2 up / down button |
+| `ui_in[4]` | Input | Serve button |
+| `ui_in[7:5]` | Input | Unused |
+| `uo_out[0]` / `uo_out[4]` | Output | Red, MSB / LSB (`R1` / `R0`) |
+| `uo_out[1]` / `uo_out[5]` | Output | Green, MSB / LSB (`G1` / `G0`) |
+| `uo_out[2]` / `uo_out[6]` | Output | Blue, MSB / LSB (`B1` / `B0`) |
+| `uo_out[3]` | Output | VSYNC, active low |
+| `uo_out[7]` | Output | HSYNC, active low |
+| `uio[3:0]` | Output | Player 1 score, 0-10 |
+| `uio[7:4]` | Output | Player 2 score, 0-10 |
+| `clk` | Input | 25.175 MHz pixel clock |
+| `rst_n` | Input | Reset, active low |
+| `ena` | Input | Unused; high while this design is selected |
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+Rotary encoders require decoding into the up/down control signals shown above.
 
-## Resources
+## Proposed Specifications
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
+| Parameter | Specification |
+| --- | --- |
+| Clock | 25.175 MHz VGA pixel clock |
+| Video | VGA, 640 × 480 at approximately 60 Hz |
+| Total video timing | 800 × 525 pixels, including blanking intervals |
+| Colours | 64 colours, with 2 bits per RGB channel |
+| Players | 2 |
+| Paddle size | 8 × 64 pixels |
+| Ball size | 8 × 8 pixels |
+| Collision behaviour | Wall and paddle bounces; the paddle half hit sets the bounce angle |
+| Serve | Serve button starts play |
+| Scoring | Scores from 0 to 10 for each player |
+| Pixel period | Approximately 40 ns |
+| Line period | Approximately 32 µs |
+| Frame period | Approximately 16.68 ms |
+| Frame rate | Approximately 60 frames per second |
+| Reset | Synchronous, active-low `rst_n`; clears scores to 0, centres paddles, and parks the ball until serve |
+| External hardware | VGA monitor, rotary encoders, and a small MCU, with supporting hardware on a separate PCB |
 
-## What next?
+## Project Timeline
 
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+The proposed schedule runs from September to November 2026, with all work planned to finish by **November 30**, three days before submission.
+
+![Project timeline and responsibilities](assets/project-timeline.png)
+
+| Milestone | Planned Date |
+| --- | --- |
+| Task 2: Code and tests | October 8, 2026 |
+| Task 3: Design review | November 5, 2026 |
+| Task 4: All checks pass | November 26, 2026 |
+| Final review and completion | November 30, 2026 |
+
+## Team Responsibilities
+
+| Area | Noah | Aaron |
+| --- | --- | --- |
+| Design (RTL) | Sync generator and pixel renderer | Game logic |
+| Simulation | cocotb tests for sync timing and the renderer | cocotb tests for game logic; gate-level simulation |
+| Design checking | Review game-logic RTL and tests | Review sync and renderer RTL and tests |
+| Calculations | VGA timing and I/O rates | Transistor budget and timing slack at 50 MHz |
+| Layout (GDS) | Documentation, precheck, and final CI run | Hardening runs, DRC/LVS, and extraction |
+| Presentation and report | Shared | Shared |
