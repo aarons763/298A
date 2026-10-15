@@ -22,13 +22,17 @@ module tb ();
   wire [7:0] uo_out;
   wire [7:0] uio_out;
   wire [7:0] uio_oe;
+  // Named views of the TinyVGA Pmod pins, so tests can wait on their edges.
+  wire       hsync = uo_out[7];
+  wire       vsync = uo_out[3];
+  wire [5:0] rgb   = {uo_out[0], uo_out[4], uo_out[1], uo_out[5], uo_out[2], uo_out[6]};  // {R,G,B}, 2 bits each
+
 `ifdef GL_TEST
   wire VPWR = 1'b1;
   wire VGND = 1'b0;
 `endif
 
-  // Replace tt_um_example with your module name:
-  tt_um_example user_project (
+  tt_um_aarons763_pong_vga user_project (
 
       // Include power ports for the Gate Level test:
 `ifdef GL_TEST

@@ -1,0 +1,34 @@
+# Reports the GF180 transistor count of src/project.v on every push and fails
+# if it goes over budget. Result appears on the run's Summary page.
+name: transistors
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  count:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Yosys
+        run: sudo apt-get update && sudo apt-get install -y yosys
+
+      - name: Cache GF180 cell data
+        uses: actions/cache@v4
+        with:
+          path: synth/pdk
+          key: gf180mcu-7t-tt-v1
+
+      - name: Build GF180 cell data
+        run: test -f synth/pdk/gf180mcu_fd_sc_mcu7t5v0__tt_025C_5v00.lib || python3 synth/build_gf180_lib.py
+
+      - name: Count transistors
+        run: |
+          set +e
+          python3 synth/count_transistors.py --hier --budget 4000 src/project.v src/pong_vga_sync.v > count.txt 2>&1
+          status=$?
+          cat count.txt
+          { echo '```'; cat count.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status

@@ -6,7 +6,7 @@ SIM ?= icarus
 FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
-PROJECT_SOURCES = project.v
+PROJECT_SOURCES = project.v pong_vga_sync.v
 
 ifneq ($(GATES),yes)
 
@@ -38,8 +38,10 @@ COMPILE_ARGS 		+= -I$(SRC_DIR)
 VERILOG_SOURCES += $(PWD)/tb.v
 TOPLEVEL = tb
 
-# List test modules to run, separated by commas and without the .py suffix:
-COCOTB_TEST_MODULES = test
+# List test modules to run, separated by commas and without the .py suffix.
+# test_vga_sync: video timing (Noah). Add the game-logic module (Aaron) here
+# once test.py holds real Pong tests instead of the template example.
+COCOTB_TEST_MODULES = test_vga_sync
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim
