@@ -37,47 +37,46 @@ module pong_game (
   reg [3:0] hits; // saturates at 9: tiers 4,6,8,10 pixels/frame
   reg [2:0] angle; // 10,15,20,25,30,35,40,45 degrees from horizontal
   wire [1:0] speed = hits >= 9 ? 2'd3 : hits >= 6 ? 2'd2 : hits >= 3 ? 2'd1 : 2'd0;
-  reg [7:0] vx,vy;
-  // Rounded speed*cos(theta), speed*sin(theta) in Q4. Constants are a small
-  // combinational lookup: no runtime multipliers, dividers or trig units.
-  // Vector magnitude differs from its nominal speed by <0.05 px/frame.
-  always @* begin
-    case ({speed,angle})
-      5'd0: begin vx=8'd63; vy=8'd11; end // 4 px/frame, 10 degrees
-      5'd1: begin vx=8'd62; vy=8'd17; end // 4 px/frame, 15 degrees
-      5'd2: begin vx=8'd60; vy=8'd22; end // 4 px/frame, 20 degrees
-      5'd3: begin vx=8'd58; vy=8'd27; end // 4 px/frame, 25 degrees
-      5'd4: begin vx=8'd55; vy=8'd32; end // 4 px/frame, 30 degrees
-      5'd5: begin vx=8'd52; vy=8'd37; end // 4 px/frame, 35 degrees
-      5'd6: begin vx=8'd49; vy=8'd41; end // 4 px/frame, 40 degrees
-      5'd7: begin vx=8'd45; vy=8'd45; end // 4 px/frame, 45 degrees
-      5'd8: begin vx=8'd95; vy=8'd17; end // 6 px/frame, 10 degrees
-      5'd9: begin vx=8'd93; vy=8'd25; end // 6 px/frame, 15 degrees
-      5'd10: begin vx=8'd90; vy=8'd33; end // 6 px/frame, 20 degrees
-      5'd11: begin vx=8'd87; vy=8'd41; end // 6 px/frame, 25 degrees
-      5'd12: begin vx=8'd83; vy=8'd48; end // 6 px/frame, 30 degrees
-      5'd13: begin vx=8'd79; vy=8'd55; end // 6 px/frame, 35 degrees
-      5'd14: begin vx=8'd74; vy=8'd62; end // 6 px/frame, 40 degrees
-      5'd15: begin vx=8'd68; vy=8'd68; end // 6 px/frame, 45 degrees
-      5'd16: begin vx=8'd126; vy=8'd22; end // 8 px/frame, 10 degrees
-      5'd17: begin vx=8'd124; vy=8'd33; end // 8 px/frame, 15 degrees
-      5'd18: begin vx=8'd120; vy=8'd44; end // 8 px/frame, 20 degrees
-      5'd19: begin vx=8'd116; vy=8'd54; end // 8 px/frame, 25 degrees
-      5'd20: begin vx=8'd111; vy=8'd64; end // 8 px/frame, 30 degrees
-      5'd21: begin vx=8'd105; vy=8'd73; end // 8 px/frame, 35 degrees
-      5'd22: begin vx=8'd98; vy=8'd82; end // 8 px/frame, 40 degrees
-      5'd23: begin vx=8'd91; vy=8'd91; end // 8 px/frame, 45 degrees
-      5'd24: begin vx=8'd158; vy=8'd28; end // 10 px/frame, 10 degrees
-      5'd25: begin vx=8'd155; vy=8'd41; end // 10 px/frame, 15 degrees
-      5'd26: begin vx=8'd150; vy=8'd55; end // 10 px/frame, 20 degrees
-      5'd27: begin vx=8'd145; vy=8'd68; end // 10 px/frame, 25 degrees
-      5'd28: begin vx=8'd139; vy=8'd80; end // 10 px/frame, 30 degrees
-      5'd29: begin vx=8'd131; vy=8'd92; end // 10 px/frame, 35 degrees
-      5'd30: begin vx=8'd123; vy=8'd103; end // 10 px/frame, 40 degrees
-      5'd31: begin vx=8'd113; vy=8'd113; end // 10 px/frame, 45 degrees
-      default: begin vx=8'd63; vy=8'd11; end
-    endcase
-  end
+  function [15:0] velocity;
+    input [4:0] selection;
+    begin
+      case(selection)
+        5'd0: velocity={8'd63,8'd11};
+        5'd1: velocity={8'd62,8'd17};
+        5'd2: velocity={8'd60,8'd22};
+        5'd3: velocity={8'd58,8'd27};
+        5'd4: velocity={8'd55,8'd32};
+        5'd5: velocity={8'd52,8'd37};
+        5'd6: velocity={8'd49,8'd41};
+        5'd7: velocity={8'd45,8'd45};
+        5'd8: velocity={8'd95,8'd17};
+        5'd9: velocity={8'd93,8'd25};
+        5'd10: velocity={8'd90,8'd33};
+        5'd11: velocity={8'd87,8'd41};
+        5'd12: velocity={8'd83,8'd48};
+        5'd13: velocity={8'd79,8'd55};
+        5'd14: velocity={8'd74,8'd62};
+        5'd15: velocity={8'd68,8'd68};
+        5'd16: velocity={8'd126,8'd22};
+        5'd17: velocity={8'd124,8'd33};
+        5'd18: velocity={8'd120,8'd44};
+        5'd19: velocity={8'd116,8'd54};
+        5'd20: velocity={8'd111,8'd64};
+        5'd21: velocity={8'd105,8'd73};
+        5'd22: velocity={8'd98,8'd82};
+        5'd23: velocity={8'd91,8'd91};
+        5'd24: velocity={8'd158,8'd28};
+        5'd25: velocity={8'd155,8'd41};
+        5'd26: velocity={8'd150,8'd55};
+        5'd27: velocity={8'd145,8'd68};
+        5'd28: velocity={8'd139,8'd80};
+        5'd29: velocity={8'd131,8'd92};
+        5'd30: velocity={8'd123,8'd103};
+        5'd31: velocity={8'd113,8'd113};
+        default: velocity={8'd63,8'd11};
+      endcase
+    end
+  endfunction
 
   function [8:0] paddle_next;
     input [8:0] pos;
@@ -88,42 +87,101 @@ module pong_game (
       else paddle_next=pos;
     end
   endfunction
-  wire [8:0] p1_next=paddle_next(pad1_y,btn[0],btn[1]);
-  wire [8:0] p2_next=paddle_next(pad2_y,btn[2],btn[3]);
-  // Signed wide intermediates detect off-screen motion without wraparound.
-  wire signed [15:0] x_trial=$signed({2'b0,ball_x}) +
-                                (dx ? $signed({8'd0,vx}) : -$signed({8'd0,vx}));
-  wire signed [15:0] y_trial=$signed({3'b0,ball_y}) +
-                                (dy ? $signed({8'd0,vy}) : -$signed({8'd0,vy}));
-  wire top_hit=y_trial < 16'sd128;   // ball top >= 8 px
-  wire bot_hit=y_trial > 16'sd7424;  // ball top <= 464 px
-  // Reflect overshoot instead of discarding it, maintaining speed at walls.
-  wire signed [15:0] y_wall=top_hit ? 16'sd256-y_trial :
+  // A pure next-state function is evaluated once per frame in simulators.
+  // Synthesis builds the same combinational physics feeding the state flops.
+  // All blocking assignments below are local function temporaries.
+  function automatic [62:0] advance_game;
+    input [62:0] state;
+    input [4:0] buttons;
+    reg [13:0] n_ball_x;
+    reg [12:0] n_ball_y;
+    reg [8:0] n_pad1_y,n_pad2_y;
+    reg [3:0] n_score1,n_score2,n_hits;
+    reg n_dx,n_dy,n_serving;
+    reg [2:0] n_angle;
+    reg [1:0] n_speed;
+    reg [7:0] vx,vy;
+    reg [8:0] p1_next;
+    reg [8:0] p2_next;
+    reg signed [15:0] x_trial;
+    reg signed [15:0] y_trial;
+    reg top_hit;
+    reg bot_hit;
+    reg signed [15:0] y_wall;
+    reg dy_wall;
+    reg [12:0] y_safe;
+    reg overlap1;
+    reg overlap2;
+    reg left_hit;
+    reg right_hit;
+    reg paddle_hit;
+    reg signed [15:0] x_reflect;
+    reg missed_left;
+    reg missed_right;
+    reg point;
+    reg [8:0] hit_pad;
+    reg signed [9:0] offset;
+    reg [9:0] distance_from_mid;
+    reg [2:0] hit_angle;
+    reg n__unused;
+    begin
+      {n_ball_x,n_ball_y,n_pad1_y,n_pad2_y,n_score1,n_score2,n_dx,n_dy,n_serving,n_hits,n_angle}=state;
+      n_speed=n_hits>=9?2'd3:n_hits>=6?2'd2:n_hits>=3?2'd1:2'd0;
+      {vx,vy}=velocity({n_speed,n_angle});
+      p1_next=paddle_next(n_pad1_y,buttons[0],buttons[1]);
+      p2_next=paddle_next(n_pad2_y,buttons[2],buttons[3]);
+      x_trial=$signed({2'b0,n_ball_x}) +
+                                (n_dx ? $signed({8'd0,vx}) : -$signed({8'd0,vx}));
+      y_trial=$signed({3'b0,n_ball_y}) +
+                                (n_dy ? $signed({8'd0,vy}) : -$signed({8'd0,vy}));
+      top_hit=y_trial < 16'sd128;
+      bot_hit=y_trial > 16'sd7424;
+      y_wall=top_hit ? 16'sd256-y_trial :
                                    bot_hit ? 16'sd14848-y_trial : y_trial;
-  wire dy_wall=top_hit ? 1'b1 : bot_hit ? 1'b0 : dy;
-  wire [12:0] y_safe=y_wall[12:0];
-  // Swept X crossing tests catch a paddle even when a frame travels farther
-  // than its width. Y overlap uses the wall-reflected destination position.
-  wire overlap1 = y_safe < ({p1_next,4'b0}+13'd1024) &&
+      dy_wall=top_hit ? 1'b1 : bot_hit ? 1'b0 : n_dy;
+      y_safe=y_wall[12:0];
+      overlap1= y_safe < ({p1_next,4'b0}+13'd1024) &&
                   (y_safe+13'd128) > {p1_next,4'b0};
-  wire overlap2 = y_safe < ({p2_next,4'b0}+13'd1024) &&
+      overlap2= y_safe < ({p2_next,4'b0}+13'd1024) &&
                   (y_safe+13'd128) > {p2_next,4'b0};
-  wire left_hit= !dx && ball_x >= 14'd384 && x_trial <= 16'sd384 && overlap1;
-  wire right_hit=dx && ball_x <= 14'd9728 && x_trial >= 16'sd9728 && overlap2;
-  wire paddle_hit=left_hit || right_hit;
-  wire signed [15:0] x_reflect=left_hit ? 16'sd768-x_trial :
+      left_hit= !n_dx && n_ball_x >= 14'd384 && x_trial <= 16'sd384 && overlap1;
+      right_hit=n_dx && n_ball_x <= 14'd9728 && x_trial >= 16'sd9728 && overlap2;
+      paddle_hit=left_hit || right_hit;
+      x_reflect=left_hit ? 16'sd768-x_trial :
                                   right_hit ? 16'sd19456-x_trial : x_trial;
-  wire missed_left=x_trial < 16'sd0;
-  wire missed_right=x_trial >= 16'sd10240;
-  wire point=missed_left || missed_right;
-  // Ball-centre minus paddle-centre, in pixels. During a hit the magnitude
-  // is at most 35 px. Four-pixel bands cover 0..31; edge grazes clamp to 45.
-  wire [8:0] hit_pad=right_hit ? p2_next : p1_next;
-  wire signed [9:0] offset=$signed({1'b0,y_safe[12:4]})-
+      missed_left=x_trial < 16'sd0;
+      missed_right=x_trial >= 16'sd10240;
+      point=missed_left || missed_right;
+      hit_pad=right_hit ? p2_next : p1_next;
+      offset=$signed({1'b0,y_safe[12:4]})-
                            $signed({1'b0,hit_pad})-10'sd28;
-  wire [9:0] distance_from_mid=offset[9] ? $unsigned(-offset) : $unsigned(offset);
-  wire [2:0] hit_angle=distance_from_mid >= 10'd32 ? 3'd7 : distance_from_mid[4:2];
-
+      distance_from_mid=offset[9] ? $unsigned(-offset) : $unsigned(offset);
+      hit_angle=distance_from_mid >= 10'd32 ? 3'd7 : distance_from_mid[4:2];
+      n_pad1_y=p1_next; n_pad2_y=p2_next;
+      if (n_serving) begin
+        n_ball_x=14'd5056; n_ball_y=13'd3776;
+        n_hits=4'd0; n_angle=3'd3;
+        if (buttons[4]) n_serving=1'b0;
+      end else if (point) begin
+        n_ball_x=14'd5056; n_ball_y=13'd3776;
+        n_serving=1'b1; n_hits=4'd0; n_angle=3'd3;
+        if (missed_right) n_score1=n_score1+4'd1;
+        else n_score2=n_score2+4'd1;
+      end else begin
+        n_ball_x=x_reflect[13:0]; n_ball_y=y_safe;
+        n_dy=dy_wall;
+        if (paddle_hit) begin
+          n_dx=left_hit;
+          // At a simultaneous wall/paddle event, send the ball into court.
+          n_dy=top_hit ? 1'b1 : bot_hit ? 1'b0 : !offset[9];
+          n_angle=hit_angle;
+          if (n_hits<9) n_hits=n_hits+4'd1;
+        end
+      end
+      n__unused=&{x_reflect[15:14],y_wall[15:13],distance_from_mid[1:0],1'b0};
+      advance_game={n_ball_x,n_ball_y,n_pad1_y,n_pad2_y,n_score1,n_score2,n_dx,n_dy,n_serving,n_hits,n_angle};
+    end
+  endfunction
   always @(posedge clk) begin
     if (!rst_n) begin
       ball_x<=14'd5056; ball_y<=13'd3776; // top-left (316,236)
@@ -132,30 +190,11 @@ module pong_game (
       hits<=4'd0; angle<=3'd3;
       score1<=4'd0; score2<=4'd0;
     end else if (frame_end) begin
-      pad1_y<=p1_next; pad2_y<=p2_next;
-      if (serving) begin
-        ball_x<=14'd5056; ball_y<=13'd3776;
-        hits<=4'd0; angle<=3'd3;
-        if (btn[4]) serving<=1'b0;
-      end else if (point) begin
-        ball_x<=14'd5056; ball_y<=13'd3776;
-        serving<=1'b1; hits<=4'd0; angle<=3'd3;
-        if (missed_right) score1<=score1+4'd1;
-        else score2<=score2+4'd1;
-      end else begin
-        ball_x<=x_reflect[13:0]; ball_y<=y_safe;
-        dy<=dy_wall;
-        if (paddle_hit) begin
-          dx<=left_hit;
-          // At a simultaneous wall/paddle event, send the ball into court.
-          dy<=top_hit ? 1'b1 : bot_hit ? 1'b0 : !offset[9];
-          angle<=hit_angle;
-          if (hits<9) hits<=hits+4'd1;
-        end
-      end
+      {ball_x,ball_y,pad1_y,pad2_y,score1,score2,dx,dy,serving,hits,angle} <= advance_game({ball_x,ball_y,pad1_y,pad2_y,score1,score2,dx,dy,serving,hits,angle},btn);
     end
   end
-  wire _unused=&{x_reflect[15:14],y_wall[15:13],distance_from_mid[1:0],1'b0};
+  wire _unused=&{speed,1'b0};
+
 endmodule
 
 module pong_render (

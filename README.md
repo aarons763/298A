@@ -29,7 +29,7 @@ For Playground, paste `src/project.v` followed by `src/pong_vga_sync.v` into `pr
 - `python3 synth/build_gf180_lib.py`, then `python3 synth/count_transistors.py --hier src/project.v src/pong_vga_sync.v`: diagnostic synthesis count/area, without an artificial transistor limit.
 - GitHub `gds`: runs the original `ttgf26a` GF180 hardening action, precheck, and gate-level tests. Passing local RTL tests or the area estimate alone does not establish fit. Check the Actions result for the exact revision being submitted.
 
-Local preliminary synthesis: **8,622 transistors, 85 flip-flops, 24,015 square micrometers** of cell area, 44.1% of nominal tile area. The tile size and placement-density settings are unchanged.
+Local preliminary synthesis: **8,680 transistors, 85 flip-flops, 24,163 square micrometers** of cell area, 44.4% of nominal tile area. The tile size and placement-density settings are unchanged. The physical clock constraint is 39.7 ns, slightly stricter than the 39.7219 ns pixel clock period. Physics is evaluated only at the frame update in behavioral simulation.
 
 ## System Architecture
 
@@ -99,6 +99,6 @@ The proposed schedule runs from September to November 2026, with all work planne
 | Design (RTL) | Sync generator and pixel renderer | Game logic |
 | Simulation | cocotb tests for sync timing and the renderer | cocotb tests for game logic; gate-level simulation |
 | Design checking | Review game-logic RTL and tests | Review sync and renderer RTL and tests |
-| Calculations | VGA timing and I/O rates | Transistor budget and timing slack at 50 MHz |
+| Calculations | VGA timing and I/O rates | Transistor budget and timing slack at 25.175 MHz |
 | Layout (GDS) | Documentation, precheck, and final CI run | Hardening runs, DRC/LVS, and extraction |
 | Presentation and report | Shared | Shared |

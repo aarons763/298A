@@ -4,7 +4,7 @@ Acceptance: **successful GDS, precheck, and gate-level flow for the 1x1 tile**. 
 
 ## Current: subpixel motion, normalized speed, 10-45 degree angles
 
-Preliminary local Yosys 0.52 estimate: **8,622 transistors, 1,126 cells, 85 flip-flops, 24,015 square micrometers**, or 44.1% of nominal 1x1 tile area. Actual acceptance comes from the GitHub GDS/precheck/gate-level jobs, not this percentage alone. Tile dimensions, process, target density, and timing constraints are unchanged.
+Preliminary local Yosys 0.52 estimate: **8,680 transistors, 1,137 cells, 85 flip-flops, 24,163 square micrometers**, or 44.4% of nominal 1x1 tile area. Actual acceptance comes from the GitHub GDS/precheck/gate-level jobs, not this percentage alone. Tile dimensions, process, and target density are unchanged. CLOCK_PERIOD is 39.7 ns to match the actual 25.175 MHz VGA clock, replacing the template 20 ns / 50 MHz constraint.
 
 The former motion-counter shortcuts are replaced with Q4 ball coordinates, whole-pixel paddle coordinates, a small 32-entry velocity lookup, and swept horizontal paddle crossing checks. This uses the available area to improve motion and collisions. The transistor CI job now reports count and area without failing at 4,000. Simulation/synthesis errors still fail, and GDS checks are not bypassed.
 
@@ -75,7 +75,7 @@ Feature costs measured on v1: scores ≈ 320 T, 8×8 ball (with comparators) +22
 
 Measured but not built: two on-chip rotary-encoder (quadrature) decoders in place of the buttons cost +252 T with one sampling flip-flop per wire, or +334 T with the safer two. Together with the speed-up that is 3,992–4,088 T, at or over budget, so the encoders are decoded on the MCU, which drives the existing up/down pins.
 
-## How the number is produced
+## Historical counting procedure (4,000-transistor policy since removed)
 
 `python3 synth/count_transistors.py --hier --budget 4000 src/project.v src/pong_vga_sync.v`
 
