@@ -14,6 +14,8 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 
 static Vtop *t;
 static uint64_t cyc = 0;
@@ -25,67 +27,53 @@ static void tick() {
 
 // ------------------------------------------------------------ reference model
 struct Model {
-  int X = 79, Y = 59;       // ball top-left, 4-px units (X is mod 200)
-  int dx = 1, dy = 1, serving = 1;
-  int p1 = 52, p2 = 52, s1 = 0, s2 = 0;
-  int points = 0, paddle_hits = 0, wall_bounces = 0;
-  int hits = 0;             // paddle hits this rally (saturates at 15)
-  int max_speed = 0;        // highest speed level reached (0..3)
-  int speed_frames[4] = {0, 0, 0, 0};
-
-  static bool ball_col(int u, int X) { return u == X || u == (X + 1) % 200; }
-
-  // pixel colour (0..3 per channel, grey = 1, white = 3) of the model frame
-  int pixel(int x, int y) const {
-    int xu = x / 4, yu = y / 4;
-    bool ball = ball_col(xu, X) && (yu == Y || yu == Y + 1);
-    bool pad = false;
-    if (x >= 16 && x < 24) pad = yu >= p1 && yu < p1 + 16;
-    if (x >= 616 && x < 624) pad = yu >= p2 && yu < p2 + 16;
-    if (ball || pad) return 3;
-    bool net = (xu == 80) && (y & 16);
-    bool wall = yu < 2 || yu >= 118;
-    return (net || wall) ? 1 : 0;
+  int X=316*16,Y=236*16,dx=1,dy=1,serving=1;
+  int p1=208,p2=208,s1=0,s2=0,hits=0,angle=3;
+  int points=0,paddle_hits=0,wall_bounces=0,max_speed=0;
+  int speed_frames[4]={0,0,0,0},angle_hits[8]={0,0,0,0,0,0,0,0};
+  int pixel(int x,int y) const {
+    bool ball=x>=X/16 && x<X/16+8 && y>=Y/16 && y<Y/16+8;
+    bool pad=((x>=16 && x<24)&&(y>=p1 && y<p1+64)) ||
+             ((x>=616 && x<624)&&(y>=p2 && y<p2+64));
+    if(ball||pad)return 3;
+    return y<8 || y>=472 ? 1 : 0;
   }
-
-  // collisions during the frame (raster order; last overlapping pixel wins)
-  void collide() {
-    for (int yu = Y; yu <= Y + 1; yu++)
-      for (int side = 0; side < 2; side++) {
-        int p = side ? p2 : p1;
-        int c0 = side ? 154 : 4;  // paddle units c0, c0+1
-        bool xo = ball_col(c0, X) || ball_col(c0 + 1, X);
-        if (xo && yu >= p && yu < p + 16) {
-          int away = side ? 0 : 1;
-          if (dx != away && hits < 15) hits++;   // a hit that turns the ball
-          dx = away;
-          dy = (yu - p) >= 8;
-          paddle_hits++;
-        }
-      }
-  }
-
   void end_of_frame(int ui) {
-    int L = hits >> 2, steps = 1 + (L >> 1) + ((L & 1) && (Y & 1));
-    if (!serving) {
-      X = (X + (dx ? steps : 200 - steps)) % 200;           // line 524
-      speed_frames[L]++;
-      if (L > max_speed) max_speed = L;
+    auto move=[](int p,bool up,bool dn) {
+      return std::clamp(p+(up==dn?0:up?-12:12),8,408);
+    };
+    p1=move(p1,ui&1,ui&2); p2=move(p2,ui&4,ui&8);
+    if(serving) {
+      X=316*16;Y=236*16;hits=0;angle=3;
+      if(ui&16)serving=0;
+      return;
     }
-    bool out = X >= 160;
-    bool at_top = Y == 2, at_bot = Y == 116;
-    if (at_top) { dy = 1; wall_bounces++; }
-    else if (at_bot) { dy = 0; wall_bounces++; }
-    bool u1 = ui & 1, d1 = ui & 2, u2 = ui & 4, d2 = ui & 8, sv = ui & 16;
-    if (u1 && !d1 && p1 != 2) p1--;
-    if (d1 && !u1 && p1 != 102) p1++;
-    if (u2 && !d2 && p2 != 2) p2--;
-    if (d2 && !u2 && p2 != 102) p2++;
-    if (out) { if (dx) s1 = (s1 + 1) & 15; else s2 = (s2 + 1) & 15; points++; }
-    bool park = serving || out;
-    serving = out || (serving && !sv);
-    if (park) { X = 79; Y = 59; hits = 0; }
-    if (!serving) Y += dy ? 1 : -1;                           // next frame
+    int level=hits/3, speed=4+2*level;
+    double theta=(10+5*angle)*3.14159265358979323846/180;
+    int vx=std::lround(16*speed*std::cos(theta));
+    int vy=std::lround(16*speed*std::sin(theta));
+    int nx=X+(dx?vx:-vx),ny=Y+(dy?vy:-vy);
+    bool top=ny<8*16,bot=ny>464*16;
+    int next_dy=dy;
+    if(top){ny=16*16-ny;next_dy=1;wall_bounces++;}
+    if(bot){ny=928*16-ny;next_dy=0;wall_bounces++;}
+    bool left=!dx && X>=24*16 && nx<=24*16 && ny<(p1+64)*16 && ny+128>p1*16;
+    bool right=dx && X<=608*16 && nx>=608*16 && ny<(p2+64)*16 && ny+128>p2*16;
+    speed_frames[level]++;max_speed=std::max(max_speed,level);
+    if(nx<0 || nx>=640*16) {
+      if(nx<0)s2=(s2+1)%16;else s1=(s1+1)%16;
+      points++;X=316*16;Y=236*16;serving=1;hits=0;angle=3;
+      return;
+    }
+    dy=next_dy;
+    if(left || right) {
+      int offset=ny/16+4-((right?p2:p1)+32);
+      angle=std::min(7,std::abs(offset)/4);
+      dx=left;dy=top?1:bot?0:offset>=0;
+      hits=std::min(9,hits+1);paddle_hits++;angle_hits[angle]++;
+      nx=2*(left?24:608)*16-nx;
+    }
+    X=nx;Y=ny;
   }
 };
 
@@ -128,14 +116,18 @@ int main(int argc, char **argv) {
   for (int fr = 0; fr < frames; fr++) {
     // ---- inputs for this frame (held for the whole frame)
     if (!script.empty()) ui = script[fr < (int)script.size() ? fr : script.size() - 1];
-    else if (mode == "ai" || mode == "lazy" || mode == "ailate") {
-      int c = m.Y + 1;  // ball centre row
-      ui = 0x10;        // keep SERVE held -> auto-serve
-      int aim1 = (fr / 50) % 12, aim2 = (fr / 70) % 12;  // vary contact point
-      if (c < m.p1 + 2 + aim1) ui |= 1; else if (c > m.p1 + 3 + aim1) ui |= 2;
-      bool lazy = (mode == "lazy" && (fr / 300) % 2)      // P2 sleeps sometimes
-               || (mode == "ailate" && m.hits >= 13);     // P2 gives up at top speed
-      if (!lazy) { if (c < m.p2 + 2 + aim2) ui |= 4; else if (c > m.p2 + 3 + aim2) ui |= 8; }
+    else if (mode == "ai" || mode == "lazy" || mode == "ailate" || mode == "rally") {
+      int c=m.Y/16+4;
+      ui=0x10;
+      int aim1=(fr/70)%48+8,aim2=(fr/90)%48+8;
+      if(mode=="rally" || mode=="ailate")aim1=aim2=32;
+      if(c<m.p1+aim1-6)ui|=1;else if(c>m.p1+aim1+6)ui|=2;
+      bool lazy=(mode=="lazy" && (fr/300)%2) || (mode=="ailate" && m.hits>=9);
+      if(lazy)ui|=8;
+      else if(c<m.p2+aim2-6)ui|=4;else if(c>m.p2+aim2+6)ui|=8;
+    } else if (mode == "edge") {
+      // Park P2 at row 100: the first serve contacts its outermost band.
+      ui = fr < 12 ? 0x18 : 0x10;
     } else if (mode == "random") {
       if (hold-- <= 0) { ui = rand() & 0x1f; hold = rand() % 40; }
       if ((ui & 3) == 3 || (ui & 12) == 12) max_both_pressed = true;
@@ -175,7 +167,6 @@ int main(int argc, char **argv) {
       prev_h = H; prev_v = V;
     }
     // ---- advance the reference model and compare scores
-    m.collide();
     m.end_of_frame(ui);
     int uio = t->uio_out;
     if (t->uio_oe != 0xff) err("uio_oe not 0xff");
@@ -191,13 +182,16 @@ int main(int argc, char **argv) {
     }
     if (frames <= 40 || fr % 100 == 0 || getenv("VERBOSE"))
       printf("F%05d ui=%02x ball=(%3d,%3d) d=(%d,%d) serve=%d pads=(%3d,%3d) score=%d:%d hits=%d\n",
-             fr, ui, m.X, m.Y, m.dx, m.dy, m.serving, m.p1, m.p2, m.s1, m.s2, m.hits);
+             fr, ui, m.X/16, m.Y/16, m.dx, m.dy, m.serving, m.p1, m.p2, m.s1, m.s2, m.hits);
   }
   printf("SUMMARY frames=%d hsync=%d vsync=%d points=%d paddle_hit_px_rows=%d wall_bounces=%d "
          "score=%d:%d max_speed=%d frames_at_speed=%d/%d/%d/%d pixel_mismatches=%d errors=%d%s\n",
          frames, nh, nv, m.points, m.paddle_hits, m.wall_bounces, m.s1, m.s2, m.max_speed,
          m.speed_frames[0], m.speed_frames[1], m.speed_frames[2], m.speed_frames[3], pix_errors, errors,
          max_both_pressed ? " (both-buttons exercised)" : "");
+  printf("ANGLE_HITS");
+  for(int a=0;a<8;a++)printf(" %ddeg=%d",10+5*a,m.angle_hits[a]);
+  printf("\n");
   delete t;
   return (errors || pix_errors) ? 1 : 0;
 }

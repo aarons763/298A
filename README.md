@@ -1,12 +1,35 @@
-# Pong VGA
+# Pong VGA (Tiny Tapeout GF180 1x1)
 
-A proposed two-player Pong game with a live VGA display, rotary-encoder controls, and hardware game logic.
+Two-player Pong with 640 x 480 VGA at **59.940476 Hz** with a 25.175 MHz clock. Hardware fit is determined by the **GDS build, Tiny Tapeout precheck, and gate-level tests** for the unchanged `1x1` GF180 tile. There is no 4,000-transistor limit; the transistor workflow is informational.
 
-## Overview
+## Smooth motion and 10-45 degree angles
 
-This project aims to build a two-player Pong-style game displayed on a VGA monitor. Two rotary encoders control player movement, with the monitor and supporting hardware connected through a separate PCB.
+- Ball positions have **1/16-pixel fractional precision**, and the renderer uses **one-pixel resolution**. Fractional travel is retained between frames, avoiding the old 4-pixel jumps. Frames are updated atomically in vertical blanking.
+- Paddle contact selects **10, 15, 20, 25, 30, 35, 40, or 45 degrees** from horizontal. Ball-center offset from paddle-center sets direction and angle; contact nearer the edges produces the steeper angles. Upper half aims up, lower half down. Four-pixel offset bands select the eight angles, with edge grazes clamped to 45 degrees.
+- Ball speed increases **4 -> 6 -> 8 -> 10 pixels/frame**, every three paddle hits, capped after hit 9 and reset after scoring. These are now **normalized vector speeds**, not just the X or dominant-axis rate. A small constant lookup approximates `vx = speed*cos(angle)` and `vy = speed*sin(angle)` in Q4, with magnitude error below 0.05 px/frame. Both components therefore scale together and angle changes do not cause large speed changes.
+- Paddles move **exactly 12 pixels/frame**, three times the original speed, and clamp to the walls. Opposing buttons cancel. Paddles still move while waiting to serve.
+- Swept horizontal crossing tests prevent fast shots skipping over a paddle. Wall reflection preserves overshoot. Paddle overlap uses the wall-reflected destination Y and the updated paddle position; this is a frame-discrete collision model, not a continuous-time rigid-body solver.
+- The 8x8 ball, 8x64 paddles, scores, controls, and wall positions remain. The center line stays removed.
 
-Planned gameplay includes paddle and wall collisions, a serve button, and player scores from 0 to 10. Ball acceleration and additional collision-angle behaviour are optional extensions, depending on the transistor budget remaining after the main game logic is implemented.
+## VGA Playground FPS versus hardware timing
+
+The circuit emits a complete frame every 800 x 525 pixel clocks: `25,175,000 / 420,000 = 59.940476 Hz`. It needs that physical input clock to run at the stated rate.
+
+VGA Playground's displayed FPS measures browser `requestAnimationFrame` timestamps. Its animation callback simulates and draws a frame. Thus 30-40 displayed FPS can reflect browser/CPU workload, display refresh, or scheduling; it is not evidence that the RTL generates 30-40 Hz VGA. See the [Playground animation loop](https://github.com/TinyTapeout/vga-playground/blob/main/src/index.ts) and [FPS counter](https://github.com/TinyTapeout/vga-playground/blob/main/src/FPSCounter.ts).
+
+Keep the Playground foreground and close other costly tabs/processes when comparing performance. A 60 Hz or faster display and a browser that can finish each simulation frame in time are needed for 60 FPS presentation. More silicon does not guarantee faster browser simulation. On the physical chip, timing is controlled by the input clock and counters, subject to passing implementation timing checks. Slower browser presentation can still look less smooth even with the finer motion.
+
+For Playground, paste `src/project.v` followed by `src/pong_vga_sync.v` into `project.v`. Keys 0-4 toggle the inputs; 4 serves and R resets. Holding serve auto-serves after a point. A one-frame MCU/encoder button pulse now moves a paddle exactly 12 pixels.
+
+## Verification
+
+- `cd test && make`: five cocotb VGA timing tests.
+- `iverilog -g2012 -s tb_features -o /tmp/pong-features src/project.v sim/tb_features.v && vvp /tmp/pong-features`: all 128 speed/angle/direction combinations, subpixel pixel progression, both paddles across 142 contact offsets, hit thresholds, fixed paddle rate and clamping, swept collisions, reflected wall overshoot, score/reset/serve.
+- `sh sim/run.sh 1600 rally`, `sh sim/run.sh 1600 ailate`, `sh sim/run.sh 1600 ai`, `sh sim/run.sh 1600 random 42`: full pin/pixel/reference, sync, and score comparisons. The independent C++ model calculates velocities with sine/cosine instead of copying the RTL table.
+- `python3 synth/build_gf180_lib.py`, then `python3 synth/count_transistors.py --hier src/project.v src/pong_vga_sync.v`: diagnostic synthesis count/area, without an artificial transistor limit.
+- GitHub `gds`: runs the original `ttgf26a` GF180 hardening action, precheck, and gate-level tests. Passing local RTL tests or the area estimate alone does not establish fit. Check the Actions result for the exact revision being submitted.
+
+Local preliminary synthesis: **8,622 transistors, 85 flip-flops, 24,015 square micrometers** of cell area, 44.1% of nominal tile area. The tile size and placement-density settings are unchanged.
 
 ## System Architecture
 
@@ -27,8 +50,8 @@ The proposed architecture uses a single 25.175 MHz clock, updates the game once 
 | `uo_out[2]` / `uo_out[6]` | Output | Blue, MSB / LSB (`B1` / `B0`) |
 | `uo_out[3]` | Output | VSYNC, active low |
 | `uo_out[7]` | Output | HSYNC, active low |
-| `uio[3:0]` | Output | Player 1 score, 0-10 |
-| `uio[7:4]` | Output | Player 2 score, 0-10 |
+| `uio[3:0]` | Output | Player 1 score, 0-15, wrapping |
+| `uio[7:4]` | Output | Player 2 score, 0-15, wrapping |
 | `clk` | Input | 25.175 MHz pixel clock |
 | `rst_n` | Input | Reset, active low |
 | `ena` | Input | Unused; high while this design is selected |
@@ -46,9 +69,9 @@ Rotary encoders require decoding into the up/down control signals shown above.
 | Players | 2 |
 | Paddle size | 8 × 64 pixels |
 | Ball size | 8 × 8 pixels |
-| Collision behaviour | Wall and paddle bounces; the paddle half hit sets the bounce angle |
+| Collision behaviour | Wall and paddle bounces; contact position selects one of eight mirrored angles from 10 to 45 degrees |
 | Serve | Serve button starts play |
-| Scoring | Scores from 0 to 10 for each player |
+| Scoring | Four-bit scores from 0 to 15, wrapping, for each player |
 | Pixel period | Approximately 40 ns |
 | Line period | Approximately 32 µs |
 | Frame period | Approximately 16.68 ms |
