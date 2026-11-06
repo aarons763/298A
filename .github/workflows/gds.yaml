@@ -38,6 +38,7 @@ jobs:
         uses: TinyTapeout/tt-gds-action/gl_test@ttgf26a
 
   viewer:
+    if: github.ref == 'refs/heads/main'
     needs: gds
     runs-on: ubuntu-24.04
     permissions:

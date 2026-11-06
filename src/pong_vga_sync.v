@@ -22,7 +22,7 @@
  *   vsync     low for lines 490..491 (it switches 1 pixel after the line
  *             starts; that 40 ns offset doesn't matter to a monitor)
  *
- * Size: 962 transistors on its own (22 flip-flops = 528 T, logic = 434 T).
+ * Historical baseline size: 962 transistors on its own (22 flip-flops = 528 T, logic = 434 T).
  * Measured against alternatives (Oct 14, 2026); see TRANSISTOR_BUDGET.md:
  *   - The two counters are 850 T of the 962 and are already at the
  *     minimum for binary counters in this cell library. They must be
@@ -78,8 +78,13 @@ module pong_vga_sync (
     // Synchronous reset, folded into the same gate as the end-of-line clear,
     // so it is nearly free. Without it simulation (including the
     // gate-level runs) would see X (unknown) forever.
-    if (!rst_n || h_end) hcount <= 10'd0;
-    else                 hcount <= hcount + 10'd1;
+    // Split the low bit: 799 is odd, so normal toggling already clears it
+    // at line end. This is equivalent even during invalid-count recovery,
+    // and maps smaller with the revised game logic.
+    if (!rst_n) hcount[0] <= 1'b0;
+    else hcount[0] <= ~hcount[0];
+    if (!rst_n || h_end) hcount[9:1] <= 9'd0;
+    else hcount[9:1] <= hcount[9:1] + {8'd0, hcount[0]};
 
     if (!rst_n || frame_end) vcount <= 10'd0;
     else                     vcount <= vcount + {9'd0, h_end};

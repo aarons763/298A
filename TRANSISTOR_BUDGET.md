@@ -1,8 +1,30 @@
 # Pong VGA: transistor budget log
 
-Target: **≤ 4,000 transistors** (GF180 `gf180mcu_fd_sc_mcu7t5v0`, 1×1 tile).
+Acceptance: **successful GDS, precheck, and gate-level flow for the 1x1 tile**. The previous 4,000-transistor target was an estimate, not a fabrication limit. Counts below are diagnostic or historical.
 
-## Current: 3,784 transistors (216 under budget)
+## Current: subpixel motion, normalized speed, 10-45 degree angles
+
+Preliminary local Yosys 0.52 estimate: **8,680 transistors, 1,137 cells, 85 flip-flops, 24,163 square micrometers**, or 44.4% of nominal 1x1 tile area. Actual acceptance comes from the GitHub GDS/precheck/gate-level jobs, not this percentage alone. Tile dimensions, process, and target density are unchanged. CLOCK_PERIOD is 39.7 ns to match the actual 25.175 MHz VGA clock, replacing the template 20 ns / 50 MHz constraint.
+
+The former motion-counter shortcuts are replaced with Q4 ball coordinates, whole-pixel paddle coordinates, a small 32-entry velocity lookup, and swept horizontal paddle crossing checks. This uses the available area to improve motion and collisions. The transistor CI job now reports count and area without failing at 4,000. Simulation/synthesis errors still fail, and GDS checks are not bypassed.
+
+## Historical revision 2: 3,958 transistors (42 margin against former target)
+
+Hit-based acceleration, angle-preserving shared-axis motion, four contact angle bands, and paddles averaging 3x their original speed. With Yosys 0.52 and the repository AREA 0 flow: **3,958 transistors, 445 cells, 69 flip-flops, 10,926 square micrometers** (20.1% of nominal tile area).
+
+Speed rises by 2 dominant-axis pixels/frame at contacts 3, 6, and 9, from 4 to 10. One saturating four-bit counter replaces the timer. A two-bit pattern counter drives the minor axis at 1/4 or 3/4 of the major axis; swapping axes produces four angle magnitudes from 14 to 76 degrees. This preserves the trajectory ratio as speed changes. Vertical movement is now performed in blanking with per-substep wall direction checks.
+
+Each paddle uses a six-bit position in 8-pixel units. Alternating one/two updates per frame yields 12 pixels/frame average, clamped at the existing bounds. Keeping exact 12-pixel increments with seven-bit paddle registers measured over budget in the tested mappings. The decorative net remains absent.
+
+The VGA horizontal counter's low bit is split from the upper nine. Because the terminal count (799) is odd, the low bit's normal toggle clears it at line end. Yosys equivalence checking proved all 26 equivalence points against the original sync module, including the registered outputs. The five original VGA tests also pass.
+
+Development measurements: the initial implementation was 4,158 transistors; a single saturating hit counter and cheaper fractional stepping reduced it to about 4,100. Compact paddle positions plus the split sync counter brought it under budget. The final source above is the delivered measurement; mapping counts can shift even for equivalent RTL expressions.
+
+The previous delivered timed-acceleration version measured 4,000 with 73 flip-flops. The original Git checkout measured 3,878 on this toolchain; the older 3,784 figure below used a different toolchain.
+
+CI must confirm the count with its Yosys/ABC version. Synthesis does not establish routed tile fit; post-route clock/repair cells are additional. This revision has not been hardened or simulated as a new gate-level netlist.
+
+## Previous version: 3,784 transistors (historical toolchain)
 
 | Block | Transistors | Flip-flops | Area (µm²) |
 |---|---:|---:|---:|
@@ -53,9 +75,9 @@ Feature costs measured on v1: scores ≈ 320 T, 8×8 ball (with comparators) +22
 
 Measured but not built: two on-chip rotary-encoder (quadrature) decoders in place of the buttons cost +252 T with one sampling flip-flop per wire, or +334 T with the safer two. Together with the speed-up that is 3,992–4,088 T, at or over budget, so the encoders are decoded on the MCU, which drives the existing up/down pins.
 
-## How the number is produced
+## Historical counting procedure (4,000-transistor policy since removed)
 
-`python3 synth/count_transistors.py --hier --budget 4000 src/project.v`
+`python3 synth/count_transistors.py --hier --budget 4000 src/project.v src/pong_vga_sync.v`
 
 - Yosys 0.33 with the same pass sequence and ABC script as LibreLane's default synthesis (`SYNTH_STRATEGY "AREA 0"`, which the TT GF180 template config doesn't override), mapped to `gf180mcu_fd_sc_mcu7t5v0` at the typical corner.
 - Transistors per cell are counted from each cell's official SPICE (`.cdl`) netlist, e.g. `dffq_1` = 24, `nand2_1` = 4, `xor2_1` = 10, `mux2_1` = 12.
