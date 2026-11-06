@@ -15,7 +15,17 @@ module tt_um_aarons763_pong_vga (
   wire [12:0] ball_y;
   wire [8:0] pad1_y,pad2_y;
   wire [3:0] score1,score2;
-  pong_game game(clk,rst_n,frame_end,ui_in[4:0],ball_x,ball_y,pad1_y,pad2_y,score1,score2);
+  // Capture once at the start of vertical blanking. The physics inputs then
+  // remain stable for 35,999 clocks before frame_end loads the game state.
+  // Reset also restarts the scan counters, so the first update after reset
+  // cannot occur until after this capture. See the scoped exception in pong.sdc.
+  reg [4:0] frame_buttons;
+  always @(posedge clk) begin
+    if (!rst_n) frame_buttons <= 5'b0;
+    else if (vcount == 10'd480 && hcount == 10'd0)
+      frame_buttons <= ui_in[4:0];
+  end
+  pong_game game(clk,rst_n,frame_end,frame_buttons,ball_x,ball_y,pad1_y,pad2_y,score1,score2);
   wire [1:0] R,G,B;
   pong_render render(hcount,vcount,visible,ball_x[13:4],ball_y[12:4],pad1_y,pad2_y,R,G,B);
   assign uo_out={hsync,B[0],G[0],R[0],vsync,B[1],G[1],R[1]};
