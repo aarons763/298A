@@ -100,6 +100,7 @@ int main(int argc, char **argv) {
   t->rst_n = 1;
   // Release traverses the two reset synchronizer stages before pixel 0.
   for (int i = 0; i < 2; i++) tick();
+  tick(); // one shared RGB/sync output stage: displayed pixel 0
 
   Model m;
   int errors = 0, pix_errors = 0;
@@ -112,8 +113,8 @@ int main(int argc, char **argv) {
   int ui = 0, hold = 0;
   bool max_both_pressed = false;
 
-  // Pixel (x, y) is on the pins while the design's hcount = x, vcount = y,
-  // i.e. during the clock cycle before the edge that moves to x+1.
+  // Beam position below tracks the displayed pixel, one clock behind the
+  // internal counters because RGB and both syncs share an output stage.
   int hc = 0, vc = 0;  // our own beam position, reset-aligned with the DUT
   for (int fr = 0; fr < frames; fr++) {
     // ---- inputs for this frame (held for the whole frame)
@@ -161,11 +162,11 @@ int main(int argc, char **argv) {
       }
       if (!prev_h && H && hc != 752) err("hsync rose at wrong hcount", hc, vc);
       if (prev_v && !V) {
-        if (!(vc == 490 && hc == 1)) err("vsync fell at wrong place", hc, vc);
+        if (!(vc == 490 && hc == 0)) err("vsync fell at wrong place", hc, vc);
         if (last_vfall && cyc - last_vfall != 800 * 525) err("vsync period", (int)(cyc - last_vfall));
         last_vfall = cyc; nv++;
       }
-      if (!prev_v && V && !(vc == 492 && hc == 1)) err("vsync rose at wrong place", hc, vc);
+      if (!prev_v && V && !(vc == 492 && hc == 0)) err("vsync rose at wrong place", hc, vc);
       prev_h = H; prev_v = V;
     }
     // ---- advance the reference model and compare scores

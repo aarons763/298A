@@ -6,7 +6,7 @@ These additional checks inspect named RTL registers, so skip them at gate level.
 import os
 import cocotb
 from cocotb.triggers import RisingEdge, Timer
-from test_vga_sync import start, sample_at, FRAME
+from test_vga_sync import start, sample_at, FRAME, CLK, VIDEO_LATENCY
 
 STATE = ("ball_x", "ball_y", "pad1_y", "pad2_y", "score1", "score2",
          "dx", "dy", "serving", "hits", "angle")
@@ -15,6 +15,8 @@ STATE = ("ball_x", "ball_y", "pad1_y", "pad2_y", "score1", "score2",
 @cocotb.test(skip=os.environ.get("GATES") == "yes")
 async def test_frame_button_capture(dut):
     t0 = await start(dut)
+    # These checks refer to internal scan/state edges, before the output stage.
+    t0 -= VIDEO_LATENCY * CLK
     top = dut.user_project
     game = top.game
     snapshot = lambda: tuple(int(getattr(game, n).value) for n in STATE)

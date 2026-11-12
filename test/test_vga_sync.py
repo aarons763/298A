@@ -34,9 +34,9 @@ FRAME = H_TOTAL * V_TOTAL                                  # 420,000 clocks
 
 H_SYNC_START = H_VISIBLE + H_FRONT                         # pixel 656
 V_SYNC_START = V_VISIBLE + V_FRONT                         # line 490
-# vsync comes from a flip-flop that looks at the line number, so it changes
-# one clock after the line starts (40 ns; a monitor can't tell).
-VSYNC_FALL = V_SYNC_START * H_TOTAL + 1                    # clock 392,001
+# The early vertical decode aligns VSYNC with pixel 0 of the output line.
+VSYNC_FALL = V_SYNC_START * H_TOTAL                        # clock 392,000
+VIDEO_LATENCY = 1  # RGB and sync output stage, relative to the scan counters
 
 PIXEL_CLOCK_HZ = 25_175_000
 CLK_NS = 40               # simulated clock period (25 MHz; only the count matters)
@@ -51,7 +51,7 @@ GATE_LEVEL = os.environ.get("GATES") == "yes"
 # ------------------------------------------------------------------ helpers
 async def start(dut):
     """Start the clock and reset. Returns the sim time (in steps) of the clock edge
-    that starts pixel 0 of line 0, i.e. the last edge with reset held."""
+    that starts output pixel 0 of line 0 (after reset and output latency)."""
     cocotb.start_soon(Clock(dut.clk, CLK_NS, unit="ns").start())
     dut.ena.value = 1
     dut.ui_in.value = 0          # no buttons: ball parked, paddles still
@@ -69,6 +69,10 @@ async def release_reset(dut):
     # edge the functional registers still see reset low, so counters are 0.
     # Move only the origin; all VESA widths, periods and pixel checks stay exact.
     for _ in range(2):
+        await RisingEdge(dut.clk)
+    # RGB and sync now share one output stage. This only shifts the absolute
+    # origin, not any width, porch, period or position within the picture.
+    for _ in range(VIDEO_LATENCY):
         await RisingEdge(dut.clk)
     return get_sim_time("step")
 

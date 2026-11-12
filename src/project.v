@@ -35,7 +35,13 @@ module tt_um_aarons763_pong_vga (
   pong_game game(clk,reset_sync_n,frame_end,frame_buttons,ball_x,ball_y,pad1_y,pad2_y,score1,score2);
   wire [1:0] R,G,B;
   pong_render render(hcount,vcount,visible,ball_x[13:4],ball_y[12:4],pad1_y,pad2_y,R,G,B);
-  assign uo_out={hsync,B[0],G[0],R[0],vsync,B[1],G[1],R[1]};
+  // One output stage for all six colour bits and both syncs. The displayed
+  // pixel trails the scan counters by one clock; syncs travel with that pixel.
+  reg [7:0] video_out;
+  always @(posedge clk) begin
+    video_out <= {hsync,B[0],G[0],R[0],vsync,B[1],G[1],R[1]};
+  end
+  assign uo_out=video_out;
   assign uio_out={score2,score1};
   assign uio_oe=8'hff;
   wire _unused=&{ena,ui_in[7:5],uio_in,ball_x[3:0],ball_y[3:0],1'b0};
