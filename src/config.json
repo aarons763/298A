@@ -18,6 +18,8 @@
   "//": "CLOCK_PERIOD - Increase this in case you are getting setup time violations.",
   "//": "25.175 MHz VGA clock needs 39.7219 ns; 39.7 ns is slightly conservative.",
   "CLOCK_PERIOD": 39.7,
+  "PNR_SDC_FILE": "dir::pong.sdc",
+  "SIGNOFF_SDC_FILE": "dir::pong.sdc",
 
   "//": "Hold slack margin - Increase them in case you are getting hold violations.",
   "PL_RESIZER_HOLD_SLACK_MARGIN": 0.1,

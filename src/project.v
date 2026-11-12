@@ -8,17 +8,40 @@ module tt_um_aarons763_pong_vga (
     input wire [7:0] uio_in, output wire [7:0] uio_out,
     output wire [7:0] uio_oe, input wire ena, clk, rst_n
 );
+  // Both assertion and release are synchronous. Only the first stage sees
+  // the external reset pin; all functional logic uses the second stage.
+  (* ASYNC_REG = "TRUE" *) reg reset_meta_n, reset_sync_n;
+  always @(posedge clk) begin
+    reset_meta_n <= rst_n;
+    reset_sync_n <= reset_meta_n;
+  end
   wire [9:0] hcount, vcount;
   wire hsync, vsync, visible, frame_end;
-  pong_vga_sync sync_gen(clk,rst_n,hcount,vcount,hsync,vsync,visible,frame_end);
+  pong_vga_sync sync_gen(clk,reset_sync_n,hcount,vcount,hsync,vsync,visible,frame_end);
   wire [13:0] ball_x;
   wire [12:0] ball_y;
   wire [8:0] pad1_y,pad2_y;
   wire [3:0] score1,score2;
-  pong_game game(clk,rst_n,frame_end,ui_in[4:0],ball_x,ball_y,pad1_y,pad2_y,score1,score2);
+  // Capture once at the start of vertical blanking. The physics inputs then
+  // remain stable for 35,999 clocks before frame_end loads the game state.
+  // Reset also restarts the scan counters, so the first update after reset
+  // cannot occur until after this capture. See the scoped exception in pong.sdc.
+  reg [4:0] frame_buttons;
+  always @(posedge clk) begin
+    if (!reset_sync_n) frame_buttons <= 5'b0;
+    else if (vcount == 10'd480 && hcount == 10'd0)
+      frame_buttons <= ui_in[4:0];
+  end
+  pong_game game(clk,reset_sync_n,frame_end,frame_buttons,ball_x,ball_y,pad1_y,pad2_y,score1,score2);
   wire [1:0] R,G,B;
   pong_render render(hcount,vcount,visible,ball_x[13:4],ball_y[12:4],pad1_y,pad2_y,R,G,B);
-  assign uo_out={hsync,B[0],G[0],R[0],vsync,B[1],G[1],R[1]};
+  // One output stage for all six colour bits and both syncs. The displayed
+  // pixel trails the scan counters by one clock; syncs travel with that pixel.
+  reg [7:0] video_out;
+  always @(posedge clk) begin
+    video_out <= {hsync,B[0],G[0],R[0],vsync,B[1],G[1],R[1]};
+  end
+  assign uo_out=video_out;
   assign uio_out={score2,score1};
   assign uio_oe=8'hff;
   wire _unused=&{ena,ui_in[7:5],uio_in,ball_x[3:0],ball_y[3:0],1'b0};

@@ -19,8 +19,8 @@
  *   frame_end 1 for one clock, on the very last pixel of each frame
  *             (hcount 799, vcount 524); the game logic updates on it
  *   hsync     low exactly while hcount = 656..751
- *   vsync     low for lines 490..491 (it switches 1 pixel after the line
- *             starts; that 40 ns offset doesn't matter to a monitor)
+ *   vsync     low exactly for lines 490..491, including pixel 0
+ *   The top level delays RGB and these syncs together by one output clock.
  *
  * Historical baseline size: 962 transistors on its own (22 flip-flops = 528 T, logic = 434 T).
  * Measured against alternatives (Oct 14, 2026); see TRANSISTOR_BUDGET.md:
@@ -96,6 +96,11 @@ module pong_vga_sync (
     // after the flip-flop's one-clock delay, it is low exactly for
     // hcount = 656..751.
     hsync <= ~((hcount >= H_SYNC_START - 1) && (hcount < H_SYNC_END - 1));
-    vsync <= ~((vcount >= V_SYNC_START) && (vcount < V_SYNC_END));
+    // Anticipate the next line on its last pixel, so the sync register
+    // changes at pixel 0, just like the counters (not one pixel later).
+    // At the two boundaries only, h_end selects the next line's sync level.
+    vsync <= ~(((vcount >= V_SYNC_START) && (vcount < V_SYNC_END)
+                && !((vcount == V_SYNC_END - 1) && h_end))
+               || ((vcount == V_SYNC_START - 1) && h_end));
   end
 endmodule
