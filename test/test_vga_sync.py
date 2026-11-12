@@ -63,8 +63,13 @@ async def start(dut):
 
 
 async def release_reset(dut):
-    await RisingEdge(dut.clk)    # this edge still sees reset -> counters = 0
+    await RisingEdge(dut.clk)
     dut.rst_n.value = 1
+    # The external pin traverses two synchronous reset flops. At the second
+    # edge the functional registers still see reset low, so counters are 0.
+    # Move only the origin; all VESA widths, periods and pixel checks stay exact.
+    for _ in range(2):
+        await RisingEdge(dut.clk)
     return get_sim_time("step")
 
 

@@ -1,6 +1,6 @@
 """RTL checks for the stability assumptions behind the scoped multicycle SDC.
 
-The pin-level VGA suite remains unchanged and also runs on the gate netlist.
+The pin-level VGA suite also runs on the gate netlist.
 These additional checks inspect named RTL registers, so skip them at gate level.
 """
 import os
@@ -50,7 +50,9 @@ async def test_frame_button_capture(dut):
     assert int(game.pad1_y.value) == int(game.pad2_y.value) == 208
     # Reset restarts both the scan and all sampled/state registers together.
     dut.rst_n.value = 0
-    await RisingEdge(dut.clk)
+    # Two synchronizer stages, then the functional flops observe reset.
+    for _ in range(3):
+        await RisingEdge(dut.clk)
     await Timer(1, unit="ns")
     assert int(top.frame_buttons.value) == 0
     assert int(top.hcount.value) == int(top.vcount.value) == 0

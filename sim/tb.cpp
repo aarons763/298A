@@ -98,6 +98,8 @@ int main(int argc, char **argv) {
   t->ena = 1; t->ui_in = 0; t->uio_in = 0; t->rst_n = 0;
   for (int i = 0; i < 10; i++) tick();
   t->rst_n = 1;
+  // Release traverses the two reset synchronizer stages before pixel 0.
+  for (int i = 0; i < 2; i++) tick();
 
   Model m;
   int errors = 0, pix_errors = 0;
