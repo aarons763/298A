@@ -7,7 +7,7 @@ module tb_features;
   wire [12:0] y;
   wire [8:0] p1,p2;
   wire [3:0] s1,s2;
-  pong_game dut(clk,rst_n,frame_end,btn,x,y,p1,p2,s1,s2);
+  pong_game dut(clk,rst_n,frame_end,btn,x,y,p1,p2,s1,s2,);
   integer a,l,d,i,evx,evy,expected,oldx,oldy,travel_x,travel_y;
   real theta,mag;
   task cycle;begin #5;clk=1;#5;clk=0;end endtask
@@ -25,7 +25,7 @@ module tb_features;
     reset;btn=16;frame;btn=0;if(dut.serving)$fatal(1,"serve");
     // Independent trigonometric reference verifies every table entry, direction,
     // magnitude, and preservation of the four fractional position bits.
-    for(l=0;l<4;l=l+1)for(a=0;a<8;a=a+1)for(d=0;d<4;d=d+1)begin
+    for(l=0;l<6;l=l+1)for(a=0;a<8;a=a+1)for(d=0;d<4;d=d+1)begin
       dut.hits=l*3;dut.angle=a;dut.dx=(d&1)!=0;dut.dy=(d&2)!=0;
       dut.ball_x=5059;dut.ball_y=3781;
       theta=(10.0+5.0*a)*3.141592653589793/180.0;
@@ -57,9 +57,9 @@ module tb_features;
     end
     // Each 3rd hit raises speed; time alone does not; maximum saturates.
     dut.hits=0;
-    for(i=1;i<=18;i=i+1)begin
+    for(i=1;i<=24;i=i+1)begin
       dut.ball_x=25*16;dut.ball_y=236*16;dut.dx=0;dut.dy=1;dut.angle=0;
-      frame;expected=i<9?i:9;
+      frame;expected=i<15?i:15;
       if(dut.hits!==expected[3:0]||dut.speed!==expected/3)$fatal(1,"hit threshold %0d",i);
     end
     dut.hits=9;dut.angle=0;dut.dx=0;dut.ball_x=32*16;dut.ball_y=236*16;
@@ -72,7 +72,7 @@ module tb_features;
     if(s2!==1||!dut.serving||dut.hits!==0||x!==5056||y!==3776)$fatal(1,"score/reset rally");
     btn=16;frame;if(dut.serving)$fatal(1,"auto serve");
     reset;if(s1!==0||s2!==0||p1!==208||p2!==208)$fatal(1,"reset");
-    $display("PASS: 128 normalized vectors, subpixel travel, 142 mirrored contacts, speed thresholds, paddle rate/clamps, swept collisions, wall reflection, scores/reset/serve");
+    $display("PASS: 192 normalized vectors, subpixel travel, 142 mirrored contacts, speed thresholds, paddle rate/clamps, swept collisions, wall reflection, scores/reset/serve");
     $finish;
   end
 endmodule

@@ -13,10 +13,11 @@
 # bits), so the same tests run on the RTL and on the gate-level netlist.
 # The one test that pokes an internal register is skipped at gate level.
 #
-# How the picture is used: rows 0-7 and 472-479 are the grey top and bottom
-# walls, which span the full 640-pixel width, so they show exactly where the
-# visible window starts and ends. Everything outside the window must be
-# black (the monitor uses that "blanking" level as its black reference).
+# How the picture is used: rows 0-7 and 472-479 are the black top and bottom
+# walls, and each has a UW gold stripe (rows 3-4 and 475-476) across the full
+# 640-pixel width, so those rows show exactly where the visible window starts
+# and ends. Everything outside the window must be black (the monitor uses
+# that "blanking" level as its black reference).
 
 import os
 
@@ -42,8 +43,10 @@ PIXEL_CLOCK_HZ = 25_175_000
 CLK_NS = 40               # simulated clock period (25 MHz; only the count matters)
 CLK = CLK_NS * 1000       # the same in simulator steps (1 ps); whole numbers avoid rounding
 
-GREY = 0b01_01_01         # rgb = {R1,R0,G1,G0,B1,B0}: walls and net
+GOLD = 0b11_10_00         # rgb = {R1,R0,G1,G0,B1,B0}: stripe in each end wall
 BLACK = 0
+TOP_STRIPE = (3, 4)       # lines of the gold stripe in the top wall
+BOTTOM_STRIPE_END = 476   # last line of the gold stripe in the bottom wall
 
 GATE_LEVEL = os.environ.get("GATES") == "yes"
 
@@ -111,15 +114,16 @@ async def test_vga_numbers(dut):
 
 @cocotb.test()
 async def test_line_timing(dut):
-    """Every pixel of lines 0 and 1: 640 visible, 16 front porch, 96 sync,
-    48 back porch; hsync low exactly for pixels 656..751; vsync stays high."""
+    """Every pixel of lines 3 and 4 (the gold stripe): 640 visible, 16 front
+    porch, 96 sync, 48 back porch; hsync low exactly for pixels 656..751;
+    vsync stays high."""
     t0 = await start(dut)
     runs = []                                  # (what, length) of each stretch
-    for line in range(2):
+    for line in TOP_STRIPE:
         for x in range(H_TOTAL):
             hs, vs, rgb = await sample_at(dut, t0, line * H_TOTAL + x)
 
-            want_rgb = GREY if x < H_VISIBLE else BLACK     # line 0/1 = top wall
+            want_rgb = GOLD if x < H_VISIBLE else BLACK     # gold stripe in the top wall
             want_hs = 0 if H_SYNC_START <= x < H_SYNC_START + H_SYNC else 1
             assert rgb == want_rgb, f"line {line} pixel {x}: rgb {rgb:06b}, want {want_rgb:06b}"
             assert hs == want_hs, f"line {line} pixel {x}: hsync {hs}, want {want_hs}"
@@ -130,7 +134,7 @@ async def test_line_timing(dut):
                 runs[-1][1] += 1
             else:
                 runs.append([what, 1])
-    dut._log.info("line 0-1 stretches (pixels): " + ", ".join(f"{w} {n}" for w, n in runs))
+    dut._log.info("line 3-4 stretches (pixels): " + ", ".join(f"{w} {n}" for w, n in runs))
     # visible 640, front porch 16, sync 96, back porch 48, visible 640, ...
     assert [n for _, n in runs[:4]] == [H_VISIBLE, H_FRONT, H_SYNC, H_BACK]
 
@@ -146,9 +150,11 @@ async def test_frame_timing(dut):
     assert await clocks_until(dut, t0, FallingEdge(dut.hsync)) == H_SYNC_START
     assert await clocks_until(dut, t0, RisingEdge(dut.hsync)) == H_SYNC_START + H_SYNC
 
-    # edges of the visible window, on the bottom wall (line 479) and below it
+    # edges of the visible window, on the bottom wall's gold stripe and below
+    # it (the last 3 visible lines are black wall)
     checks = [
-        (479, 0, GREY), (479, 639, GREY), (479, 640, BLACK),
+        (BOTTOM_STRIPE_END, 0, GOLD), (BOTTOM_STRIPE_END, 639, GOLD),
+        (BOTTOM_STRIPE_END, 640, BLACK), (479, 0, BLACK),
         (480, 0, BLACK), (489, 300, BLACK),
     ]
     for line, x, want in checks:
@@ -166,8 +172,8 @@ async def test_frame_timing(dut):
     # back porch is blank, then the next frame starts at line 0 pixel 0
     _, _, rgb = await sample_at(dut, t0, (V_TOTAL - 1) * H_TOTAL + (H_TOTAL - 1))
     assert rgb == BLACK, "last pixel of the frame should be black"
-    _, _, rgb = await sample_at(dut, t0, FRAME)
-    assert rgb == GREY, "pixel 0 of the next frame should be the top wall"
+    _, _, rgb = await sample_at(dut, t0, FRAME + TOP_STRIPE[0] * H_TOTAL)
+    assert rgb == GOLD, "line 3 of the next frame should be the top wall's gold stripe"
 
     # and the frame period is exact
     fall2 = await clocks_until(dut, t0, FallingEdge(dut.vsync))
@@ -176,7 +182,8 @@ async def test_frame_timing(dut):
 
 @cocotb.test()
 async def test_reset_mid_frame(dut):
-    """Reset in the middle of a frame restarts the picture at line 0, pixel 0."""
+    """Reset in the middle of a frame restarts the picture at line 0, pixel 0:
+    the first hsync, the top wall's gold stripe and vsync all land on time."""
     t0 = await start(dut)
     await Timer(123_457 * CLK_NS, unit="ns")       # somewhere around line 154
     dut.rst_n.value = 0
@@ -184,9 +191,10 @@ async def test_reset_mid_frame(dut):
         await RisingEdge(dut.clk)
     t0 = await release_reset(dut)
 
-    _, _, rgb = await sample_at(dut, t0, 0)
-    assert rgb == GREY, "pixel 0 after reset should be the top wall"
+    # (checked in time order: the simulation only moves forward)
     assert await clocks_until(dut, t0, FallingEdge(dut.hsync)) == H_SYNC_START
+    _, _, rgb = await sample_at(dut, t0, TOP_STRIPE[0] * H_TOTAL)
+    assert rgb == GOLD, "line 3 after reset should be the top wall's gold stripe"
     assert await clocks_until(dut, t0, FallingEdge(dut.vsync)) == VSYNC_FALL
 
 

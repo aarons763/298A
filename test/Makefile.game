@@ -1,0 +1,20 @@
+# Game-logic tests: pong_game on its own, with Python driving frame_end.
+# Run from the test/ folder:   make -f Makefile.game
+# One test only:               make -f Makefile.game COCOTB_TEST_FILTER=test_serve
+# Waveform:                    gtkwave tb_game.fst
+
+SIM ?= icarus
+FST ?= -fst
+TOPLEVEL_LANG ?= verilog
+SRC_DIR = $(PWD)/../src
+
+SIM_BUILD = sim_build/game
+VERILOG_SOURCES += $(SRC_DIR)/project.v $(SRC_DIR)/pong_vga_sync.v
+VERILOG_SOURCES += $(PWD)/tb_game.v
+COMPILE_ARGS += -I$(SRC_DIR)
+
+TOPLEVEL = tb_game
+COCOTB_TEST_MODULES = test_game
+COCOTB_RESULTS_FILE = results_game.xml
+
+include $(shell cocotb-config --makefiles)/Makefile.sim
